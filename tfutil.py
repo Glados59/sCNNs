@@ -36,7 +36,7 @@ def adaptive_global_average_pool_2d(x):
     return tf.reshape(tf.reduce_mean(x, axis=[1, 2]), [-1, 1, 1, c])
 
 
-def conv2d(x, f=64, k=3, s=1, pad='SAME', use_bias=True, reuse=None, name='conv2d'):
+def conv2d(x, f=64, k=3, s=1, pad='SAME', use_bias=True, reuse=None, name=None):
     """
     :param x: input
     :param f: filters

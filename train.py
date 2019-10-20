@@ -49,7 +49,6 @@ def main():
 
     lr_shape = lr.shape[1:]
     hr_shape = hr.shape[1:]
-
     print("[+] Loaded LR patch image ", lr.shape)
     print("[+] Loaded HR patch image ", hr.shape)
 
@@ -94,7 +93,6 @@ def main():
                       path=config.output_dir + "/sample_hr.png",
                       use_inverse=False,
                       )
-
         # scaling into lr [0, 1]
         sample_lr /= 255.
 
@@ -170,17 +168,17 @@ def main():
                     # summary & output
                     summary, output = sess.run([rcan_model.merged, rcan_model.output],
                                                feed_dict={
-                                                   rcan_model.x_lr: sample_lr,
-                                                   rcan_model.x_hr: sample_hr,
+                                                   rcan_model.x_lr: x_lr,
+                                                   rcan_model.x_hr: x_hr,
                                                    rcan_model.lr: lr,
                                                })
                     writer.add_summary(summary, global_step)
                     # model save
-                    rcan_model.saver.save(sess, config.summary+'latest/', global_step)
+                    rcan_model.saver.save(sess, config.summary, global_step)
 
                     if loss < best_loss:
                         print("[*] improved {:.8f} to {:.8f}".format(best_loss, loss))
-                        rcan_model.best_saver.save(sess, config.summary+'best/', global_step)
+                        rcan_model.best_saver.save(sess, './best/', global_step)
                         best_loss = loss
 
                 if global_step % (config.logging_step*10) == 0:

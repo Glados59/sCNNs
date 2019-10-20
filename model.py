@@ -8,7 +8,6 @@ import tensorflow as tf
 class RCAN:
 
     def __init__(self,
-                 # sess,                                     # tensorflow session
                  batch_size=16,                            # batch size
                  n_channel=3,                              # number of image channel, 3 for RGB, 1 for gray-scale
                  img_scaling_factor=4,                     # image scale factor to up
@@ -198,6 +197,18 @@ class RCAN:
                 raise NotImplementedError("[-] Not supported scaling factor (%d)" % scale_factor)
             return x
 
+    def dense_block(self, inputs, depth=8, rate=16, out_dims=128,
+                    scope=None, reuse=None):
+        filters = out_dims - rate * depth
+        feat = [inputs]
+        with tf.variable_scope(scope, 'DenseBlock', reuse=reuse):
+            for _ in range(depth):
+                filters += rate
+                x = tf.nn.relu(tfu.conv2d(feat[-1], filters, 3))
+                feat.append(x)
+                feat[-1] = tf.concat(feat[1:], axis=-1)
+            return x
+
     def residual_channel_attention_network(self, x, f, kernel_size, reduction, use_bn, scale):
         with tf.variable_scope("Residual_Channel_Attention_Network"):
             x = self.image_processing(x, sign=-1, name='pre-processing')
@@ -231,9 +242,19 @@ class RCAN:
             # x = self.image_processing(tail, sign=1, name='post-processing')
             return x
 
+    def SRDenseNet(self, x, f, kernel_size, reduction, use_bn, scale):
+        with tf.variable_scope("SRDenseNet"):
+            feat=[tfu.conv2d(x, f=f, k=kernel_size)]
+            for i in range(8):
+                feat.append(self.dense_block(feat[-1]))
+            bottleneck = tfu.conv2d(tf.concat(feat, -1), 256, 1)
+            sr = self.up_scaling(bottleneck, f, scale, name='up-scaling')
+            sr = tfu.conv2d(sr, 3, 3)
+            return sr
+
     def build_model(self):
         # RCAN model
-        self.output = self.srcnn(x=self.x_lr,f=self.n_filters,kernel_size=self.kernel_size,
+        self.output = self.SRDenseNet(x=self.x_lr,f=self.n_filters,kernel_size=self.kernel_size,
                                                               reduction=self.reduction,use_bn=self.use_bn,scale=self.img_scale,)
         self.output = tf.clip_by_value(self.output * 255., 0., 255.)
 
@@ -253,7 +274,7 @@ class RCAN:
         tf.summary.image('hr', self.x_hr, max_outputs=self.batch_size)
         tf.summary.image('generated-hr', self.output, max_outputs=self.batch_size)
 
-        tf.summary.scalar("loss/l1_loss", self.loss)
+        tf.summary.scalar("loss/l2_loss", self.loss)
         tf.summary.scalar("metric/psnr", self.psnr)
         tf.summary.scalar("metric/ssim", self.ssim)
         tf.summary.scalar("misc/lr", self.lr)
@@ -262,6 +283,6 @@ class RCAN:
         self.merged = tf.summary.merge_all()
 
         # model saver
-        self.saver = tf.train.Saver(max_to_keep=1)
+        self.saver = tf.train.Saver(max_to_keep=2)
         self.best_saver = tf.train.Saver(max_to_keep=1)
         # self.writer = tf.summary.FileWriter(self.tf_log, self.sess.graph)

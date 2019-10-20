@@ -39,12 +39,13 @@ def merge(images, size):
 
 def split(image, n_patch=16):
     h, w, c = image.shape
-    assert h == w
+    # assert h == w
 
     patch = int(np.sqrt(n_patch))
-    patch_size = h // patch
+    patch_size_h = h // patch
+    patch_size_w = w // patch
 
-    patch_images = [image[patch_size * j: patch_size * (j + 1), patch_size * i: patch_size * (i + 1), :]
+    patch_images = [image[patch_size_h * j: patch_size_h * (j + 1), patch_size_w * i: patch_size_w * (i + 1), :]
                     for j in range(patch) for i in range(patch)]
     return patch_images
 
