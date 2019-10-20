@@ -35,7 +35,7 @@ network_arg.add_argument('--l2_reg', type=float, default=5e-4)
 
 # Train/Test hyper-parameters
 train_arg = add_arg_group('Training')
-train_arg.add_argument('--batch_size', type=int, default=16)
+train_arg.add_argument('--batch_size', type=int, default=1)
 train_arg.add_argument('--epochs', type=int, default=1000)
 train_arg.add_argument('--logging_step', type=int, default=50)
 train_arg.add_argument('--optimizer', type=str, default='adam', choices=['adam', 'sgd'])
@@ -51,9 +51,11 @@ train_arg.add_argument('--opt_epsilon', type=float, default=1e-8)
 # Train/Test hyper-parameters
 data_arg = add_arg_group('Data')
 data_arg.add_argument('--data_dir', type=str, default="./DataSet//DIV2K//")
+data_arg.add_argument('--test_dir', type=str, default="./DataSet/test/DIV2K//")
 data_arg.add_argument('--output_dir', type=str, default='./output/')
-data_arg.add_argument('--summary', type=str, default='./log/')
-data_arg.add_argument('--patch_size', type=int, default=16)
+data_arg.add_argument('--summary', type=str, default='./train_log/')
+data_arg.add_argument('--test_log', type=str, default='./test_log/')
+data_arg.add_argument('--patch_size', type=int, default=1)
 
 # Misc
 misc_arg = add_arg_group('Misc')

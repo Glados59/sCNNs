@@ -37,12 +37,15 @@ class DataSetLoader:
             raise ValueError("[-] There's no supporting file... [%s] :(" % ext)
 
     @staticmethod
-    def get_img(path, size=(64, 64), interp=cv2.INTER_CUBIC):
+    def get_img(path, kind, size=(64, 64), interp=cv2.INTER_CUBIC):
         img = cv2.imread(path, cv2.IMREAD_COLOR)[..., ::-1]  # BGR to RGB
         if img.shape[:1] == size:
             return img
         else:
-            return cv2.resize(img, size, interp)
+            if kind == 'lr':
+                img = img[0:size[0]*4,0:size[1]*4]
+            else: img = img[0:size[0],0:size[1]]
+        return cv2.resize(img, size, interp)
 
     @staticmethod
     def parse_tfr_tf(record):
@@ -79,8 +82,9 @@ class DataSetLoader:
 
     def __init__(self, path, size=None, name='to_tfr', use_save=False, save_file_name='',
                  buffer_size=4096, n_threads=8,
-                 use_image_scaling=False, image_scale='0,1', img_save_method=cv2.INTER_LINEAR, debug=True):
+                 use_image_scaling=False, image_scale='0,1', img_save_method=cv2.INTER_LINEAR, debug=True, kind=None, train_label=True):
 
+        self.kind = kind
         self.op = name.split('_')
         self.debug = debug
 
@@ -145,7 +149,7 @@ class DataSetLoader:
         self.img_save_method = img_save_method
 
         if self.op_src == self.types[0]:
-            self.load_img()
+            self.load_img(self.kind)
         elif self.op_src == self.types[1]:
             self.load_tfr()
         elif self.op_src == self.types[2]:
@@ -191,12 +195,12 @@ class DataSetLoader:
         if self.use_image_scaling:
             self.raw_data = self.img_scaling(self.raw_data, self.img_scale)
 
-    def load_img(self):
+    def load_img(self, kind):
         self.raw_data = np.zeros((len(self.file_list), self.height * self.width * self.channel),
                                  dtype=np.uint8)
 
         for i, fn in tqdm(enumerate(self.file_names)):
-            self.raw_data[i] = self.get_img(fn, (self.height, self.width), self.img_save_method).flatten()
+            self.raw_data[i] = self.get_img(fn, kind, (self.height, self.width), self.img_save_method).flatten()
             if self.debug:  # just once
                 print("[*] Image Shape   : ", self.raw_data[i].shape)
                 print("[*] Image Size    : ", self.raw_data[i].size)
@@ -291,11 +295,10 @@ class DataSetLoader:
 
 class Div2KDataSet:
 
-    def __init__(self, hr_height=768, hr_width=768, lr_height=192, lr_width=192, channel=3,
-                 n_patch=16, use_split=False, split_rate=0.1, random_state=42, n_threads=8,
-                 ds_path=None, ds_name=None, use_img_scale=True,
-                 ds_hr_path=None, ds_lr_path=None,
-                 use_save=False, save_type='to_h5', save_file_name=None, debug=False):
+    def __init__(self, hr_height=768, hr_width=768, lr_height=192, lr_width=192, channel=3, n_images=800, n_patch=16,
+                 use_split=False, split_rate=0.1, random_state=42, n_threads=8,
+                 ds_path=None, ds_name=None, use_img_scale=True, ds_hr_path=None, ds_lr_path=None,
+                 use_save=False, save_type='to_h5', save_file_name=None, is_train=True, debug=False):
 
         """
         # General Settings
@@ -358,6 +361,7 @@ class Div2KDataSet:
         self.use_save = use_save
         self.save_type = save_type
         self.save_file_name = save_file_name
+        self.is_train = is_train
         self.debug = debug
 
         try:
@@ -368,33 +372,60 @@ class Div2KDataSet:
         except AssertionError:
             raise AssertionError("[-] save-file/folder-name is required!")
 
-        self.n_images = 800
+        self.n_images = n_images
         self.n_images_val = 100
 
         self.use_img_scaling = use_img_scale
 
-        if self.ds_path:  # like .h5 or .tfr # will be in the same folder
-            self.ds_hr_path = self.ds_path + "/DIV2K_train_HR/"
-            self.ds_lr_path = self.ds_hr_path
-
-        self.hr_images = DataSetLoader(path=self.ds_hr_path,
-                                       size=self.hr_shape,
-                                       use_save=self.use_save,
-                                       name=self.save_type,
-                                       save_file_name=self.save_file_name + "-hr.h5",
-                                       use_image_scaling=self.use_img_scaling,
-                                       image_scale='0,1',
-                                       img_save_method=cv2.INTER_LINEAR).raw_data  # numpy arrays
+        if self.is_train:
+            if self.ds_path:  # like .h5 or .tfr # will be in the same folder
+                self.ds_hr_path = self.ds_path + "/DIV2K_train_HR/"
+                self.ds_lr_path = self.ds_hr_path
+            self.hr_images = DataSetLoader(path=self.ds_hr_path,
+                                           size=self.hr_shape,
+                                           use_save=self.use_save,
+                                           name=self.save_type,
+                                           save_file_name=self.save_file_name + "-hr.h5",
+                                           use_image_scaling=self.use_img_scaling,
+                                           image_scale='0,1',
+                                           img_save_method=cv2.INTER_LINEAR,  # numpy arrays
+                                           kind='hr',
+                                           train_label=True).raw_data
+            self.lr_images = DataSetLoader(path=self.ds_lr_path,
+                                           size=self.lr_shape,
+                                           use_save=self.use_save,
+                                           name=self.save_type,
+                                           save_file_name=self.save_file_name + "-lr.h5",
+                                           use_image_scaling=self.use_img_scaling,
+                                           image_scale='0,1',
+                                           img_save_method=cv2.INTER_CUBIC,  # numpy arrays
+                                           kind='lr',
+                                           train_label=True).raw_data
+        else:
+            if self.ds_path:  # like .h5 or .tfr # will be in the same folder
+                self.ds_hr_path = self.ds_path + "/DIV2K_valid_HR/"
+                self.ds_lr_path = self.ds_hr_path
+            self.hr_images = DataSetLoader(path=self.ds_hr_path,
+                                           size=self.hr_shape,
+                                           use_save=self.use_save,
+                                           name=self.save_type,
+                                           save_file_name=self.save_file_name + "-hr.h5",
+                                           use_image_scaling=self.use_img_scaling,
+                                           image_scale='0,1',
+                                           img_save_method=cv2.INTER_LINEAR,  # numpy arrays
+                                           kind='hr',
+                                           train_label=False).raw_data
+            self.lr_images = DataSetLoader(path=self.ds_lr_path,
+                                           size=self.lr_shape,
+                                           use_save=self.use_save,
+                                           name=self.save_type,
+                                           save_file_name=self.save_file_name + "-lr.h5",
+                                           use_image_scaling=self.use_img_scaling,
+                                           image_scale='0,1',
+                                           img_save_method=cv2.INTER_CUBIC,  # numpy arrays
+                                           kind='lr',
+                                           train_label=False).raw_data
         self.patch_hr_images = None
-
-        self.lr_images = DataSetLoader(path=self.ds_lr_path,
-                                       size=self.lr_shape,
-                                       use_save=self.use_save,
-                                       name=self.save_type,
-                                       save_file_name=self.save_file_name + "-lr.h5",
-                                       use_image_scaling=self.use_img_scaling,
-                                       image_scale='0,1',
-                                       img_save_method=cv2.INTER_CUBIC).raw_data  # numpy arrays
         self.patch_lr_images = None
 
         if self.n_patch > 0:
