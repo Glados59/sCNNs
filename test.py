@@ -29,7 +29,7 @@ def get_img(path):
 def main():
 
     if data_from == 'img':
-        ds = DataSet(ds_path=config.test_dir,
+        ds = DataSet(hr_height=1080, hr_width=1080, lr_height=270, lr_width=270, ds_path=config.test_dir,
                      ds_name="X4",
                      use_save=True,
                      save_type="to_h5",
@@ -39,7 +39,7 @@ def main():
                      n_images=100,
                      is_train=False)
     else:  # .h5 files
-        ds = DataSet(ds_hr_path=config.test_dir + "DIV2K-hr.h5",
+        ds = DataSet(hr_height=1080, hr_width=1080, lr_height=270, lr_width=270, ds_hr_path=config.test_dir + "DIV2K-hr.h5",
                      ds_lr_path=config.test_dir + "DIV2K-lr.h5",
                      use_img_scale=False,
                      n_patch=config.patch_size,
